@@ -1,0 +1,17 @@
+replicaCount: 2
+image:
+  repository: 314323855520.dkr.ecr.us-east-1.amazonaws.com/flask-eks-infra
+  tag: latest
+  pullPolicy: Always
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 5000
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 5000
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 5000
