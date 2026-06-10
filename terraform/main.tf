@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.46"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.0"
+    }
     http = {
       source  = "hashicorp/http"
       version = "~> 3.0"
@@ -15,6 +19,19 @@ terraform {
 provider "aws" {
   region = var.region
 }
+
+provider "helm" {
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      command     = "aws"
+    }
+  }
+}
+
 
 module "vpc" {
   source               = "./modules/vpc"
@@ -86,6 +103,9 @@ module "eks" {
     kube-proxy = {
       most_recent = true
     }
+    aws-ebs-csi-driver = {
+      most_recent = true
+    }
   }
 }
 
@@ -104,6 +124,49 @@ resource "aws_ecr_repository" "app" {
 
   image_scanning_configuration {
     scan_on_push = true
+  }
+
+  tags = var.tags
+}
+
+resource "helm_release" "monitoring" {
+  name             = "monitoring"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  namespace        = "monitoring"
+  create_namespace = true
+  version = "86.2.0"
+
+  wait          = true
+  wait_for_jobs = true
+  atomic        = true
+  timeout       = 600
+
+  values = [file("${path.module}/monitoring-values.yaml")]
+
+  set_sensitive = [
+    {
+      name  = "grafana.adminPassword"
+      value = tostring(var.grafana_password)
+    }
+  ]
+
+  depends_on = [module.eks]
+}
+
+module "ebs_csi_pod_identity" {
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "~> 1.0"
+
+  name                          = "aws-ebs-csi"
+  attach_aws_ebs_csi_policy     = true
+
+  associations = {
+    this = {
+      cluster_name    = module.eks.cluster_name
+      namespace       = "kube-system"
+      service_account = "ebs-csi-controller-sa"
+    }
   }
 
   tags = var.tags

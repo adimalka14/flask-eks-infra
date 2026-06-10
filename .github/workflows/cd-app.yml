@@ -1,0 +1,64 @@
+name: CD - Application
+
+on:
+  workflow_run:
+    workflows: ["CD - Infrastructure"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: terraform-state
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Get Terraform outputs
+        working-directory: terraform
+        run: |
+          terraform init
+          echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
+          echo "ECR_REPO_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
+          echo "REGION=$(terraform output -raw region)" >> $GITHUB_ENV
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REPO_URL:$IMAGE_TAG ./app
+          docker push $ECR_REPO_URL:$IMAGE_TAG
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region $REGION \
+            --name $CLUSTER_NAME
+
+      - name: Deploy with Helm
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          helm upgrade --install flask-app ./helm/server \
+            --set image.repository=$ECR_REPO_URL \
+            --set image.tag=$IMAGE_TAG \
+            --wait \
+            --timeout 5m

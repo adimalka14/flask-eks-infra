@@ -1,0 +1,52 @@
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+
+grafana:
+  enabled: true
+  sidecar:
+    dashboards:
+      enabled: true
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: "1"
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  dashboards:
+    default:
+      node-exporter:
+        gnetId: 1860    # Node Exporter Full
+        revision: 37
+        datasource: Prometheus
+      kubernetes-pods:
+        gnetId: 6417    # Kubernetes pods
+        revision: 1
+        datasource: Prometheus
+      flask-app:
+        gnetId: 11074 # Flask/Python dashboard
+        revision: 1
+        datasource: Prometheus
+
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false

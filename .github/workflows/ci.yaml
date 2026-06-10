@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t flask-app:test ./app
+
+      - name: Run tests
+        run: docker run flask-app:test python -m pytest tests/ -v
+
+      - name: Terraform validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform validate

@@ -1,6 +1,6 @@
 replicaCount: 2
 image:
-  repository: 314323855520.dkr.ecr.us-east-1.amazonaws.com/flask-eks-infra
+  repository: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flask-eks-infra
   tag: latest
   pullPolicy: Always
 service:

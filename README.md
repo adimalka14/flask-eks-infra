@@ -16,11 +16,13 @@ GitHub Actions
      Node Group  Node Group
          │
      LoadBalancer (internet-facing)
+              │
+         Prometheus + Grafana (monitoring namespace)
 ```
 
 ## Prerequisites
 
-- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5
+- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.15
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) configured (`aws configure`)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Helm](https://helm.sh/docs/intro/install/) >= 3
@@ -30,7 +32,14 @@ GitHub Actions
 
 ## Step 1 — Provision Infrastructure with Terraform
 
-### 1.1 Bootstrap remote state (S3 + DynamoDB)
+### 1.1 Copy and fill in variables
+
+```bash
+cp terraform/terraform.example.tfvars terraform/terraform.tfvars
+# Edit terraform.tfvars with your values
+```
+
+### 1.2 Bootstrap remote state (S3 + DynamoDB)
 
 ```bash
 cd terraform
@@ -38,9 +47,9 @@ terraform init
 terraform apply -target=module.bootstrap
 ```
 
-This creates the S3 bucket (`flask-eks-infra-tr-state`) and DynamoDB lock table used as the Terraform backend.
+This creates the S3 bucket and DynamoDB lock table used as the Terraform backend.
 
-### 1.2 Provision all resources
+### 1.3 Provision all resources
 
 ```bash
 terraform apply
@@ -48,12 +57,13 @@ terraform apply
 
 Resources created:
 - VPC with public and private subnets
-- EKS cluster (`flask-eks-infra-cluster`, Kubernetes 1.31)
-- Two EKS node groups (one per subnet)
+- EKS cluster (Kubernetes 1.31)
+- Two EKS node groups (public + private)
 - ECR repository for the Docker image
 - IAM roles and policies
+- Prometheus + Grafana (kube-prometheus-stack)
 
-### 1.3 Key outputs
+### 1.4 Key outputs
 
 | Output | Description |
 |--------|-------------|
@@ -96,7 +106,7 @@ docker push $ECR_URL:latest
 ```bash
 aws eks update-kubeconfig \
   --region us-east-1 \
-  --name flask-eks-infra-cluster
+  --name $(terraform -chdir=terraform output -raw cluster_name)
 ```
 
 ### 3.2 Deploy
@@ -105,7 +115,7 @@ aws eks update-kubeconfig \
 ECR_URL=$(terraform -chdir=terraform output -raw ecr_repository_url)
 IMAGE_TAG=$(git rev-parse --short HEAD)
 
-helm upgrade --install flask-server ./helm/server \
+helm upgrade --install flask-app ./helm/server \
   --set image.repository=$ECR_URL \
   --set image.tag=$IMAGE_TAG \
   --namespace default
@@ -114,7 +124,7 @@ helm upgrade --install flask-server ./helm/server \
 ### 3.3 Get the public endpoint
 
 ```bash
-kubectl get svc flask-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get svc flask-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
 Open the printed URL in a browser — the app should return:
@@ -126,19 +136,48 @@ Open the printed URL in a browser — the app should return:
 
 ## Step 4 — GitHub Actions (CI/CD)
 
-Set the following secrets in **Settings → Secrets and variables → Actions**:
+### 4.1 Required Secrets
 
-| Secret | Value |
-|--------|-------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-| `AWS_REGION` | `us-east-1` |
-| `ECR_REPOSITORY_URL` | output of `ecr_repository_url` |
-| `EKS_CLUSTER_NAME` | `flask-eks-infra-cluster` |
+Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
 
-On every push to `main` the workflow will:
-1. Build the Docker image and push it to ECR (tagged with the commit SHA)
-2. Deploy/update the Helm release on EKS
+| Secret | Where to get it |
+|--------|----------------|
+| `AWS_ACCESS_KEY_ID` | IAM user with EKS/ECR/S3/DynamoDB permissions |
+| `AWS_SECRET_ACCESS_KEY` | Same IAM user |
+| `AWS_REGION` | e.g. `us-east-1` |
+| `GRAFANA_PASSWORD` | Password for Grafana admin (must contain letters, not digits only) |
+
+> **Note:** `ECR_REPOSITORY_URL` and `EKS_CLUSTER_NAME` are **not** needed as secrets — the CD pipeline reads them directly from `terraform output`.
+
+### 4.2 Required Environment
+
+The `cd-infra` workflow gates destructive Terraform changes (destroys) behind a manual approval.
+
+Go to **Settings → Environments → New environment** and create one named exactly:
+
+```
+production
+```
+
+Optionally add required reviewers to enforce human approval before any `terraform destroy`.
+
+### 4.3 Required IAM permissions
+
+The IAM user behind the secrets needs at minimum:
+
+- `AmazonEKSClusterPolicy` + `eks:*`
+- `AmazonEC2ContainerRegistryFullAccess`
+- `AmazonS3FullAccess` (Terraform state bucket)
+- `AmazonDynamoDBFullAccess` (Terraform lock table)
+- `IAMFullAccess` (Terraform manages IAM roles)
+
+### 4.4 Workflows
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yaml` | PR to `main` | Builds Docker image, runs pytest, validates Terraform |
+| `cd-app.yml` | Push to `main` (app/helm changes) | Builds & pushes image to ECR, deploys via Helm |
+| `cd-infra.yml` | Push to `main` (terraform changes) | Runs `terraform plan`; auto-applies if no destroys, requires manual approval otherwise |
 
 ---
 
@@ -153,9 +192,37 @@ On every push to `main` the workflow will:
 
 ---
 
+## Monitoring
+
+Grafana is deployed in the `monitoring` namespace via kube-prometheus-stack.
+
+```bash
+# Port-forward to access Grafana locally
+kubectl port-forward svc/monitoring-grafana 3000:80 -n monitoring
+```
+
+Open [http://localhost:3000](http://localhost:3000) — login with `admin` and the value of `GRAFANA_PASSWORD`.
+
+Pre-loaded dashboards:
+- Node Exporter Full
+- Kubernetes Pods
+- Flask/Python app metrics
+
+---
+
+## Running Tests Locally
+
+```bash
+cd app
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+---
+
 ## Teardown
 
 ```bash
-helm uninstall flask-server
+helm uninstall flask-app
 cd terraform && terraform destroy
 ```

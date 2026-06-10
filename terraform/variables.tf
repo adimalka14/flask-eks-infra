@@ -60,3 +60,9 @@ variable "table_name" {
   description = "DynamoDB table name for state locking"
   type        = string
 }
+
+variable "grafana_password" {
+  description = "Password for Grafana admin user"
+  type        = string
+  sensitive   = true
+}
