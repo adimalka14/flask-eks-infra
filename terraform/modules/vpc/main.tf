@@ -74,8 +74,8 @@ resource "aws_subnet" "private" {
   count = var.private_subnet_count
 
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
-  availability_zone       = data.aws_availability_zones.available.names[(count.index + 10) % length(data.aws_availability_zones.available.names)]
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index + var.public_subnet_count)
+  availability_zone       = data.aws_availability_zones.available.names[(count.index + var.public_subnet_count) % length(data.aws_availability_zones.available.names)]
   map_public_ip_on_launch = false
 
   tags = {
