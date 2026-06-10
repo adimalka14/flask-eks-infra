@@ -46,21 +46,6 @@ variable "tags" {
   default     = {}
 }
 
-variable "bucket_name" {
-  description = "S3 bucket name for Terraform state"
-  type        = string
-}
-
-variable "environment" {
-  description = "Environment name (e.g. production, staging)"
-  type        = string
-}
-
-variable "table_name" {
-  description = "DynamoDB table name for state locking"
-  type        = string
-}
-
 variable "grafana_password" {
   description = "Password for Grafana admin user"
   type        = string

@@ -32,7 +32,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config="bucket=${{ vars.STATE_BUCKET_NAME }}" -backend-config="dynamodb_table=${{ vars.STATE_TABLE_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
 
       - name: Terraform Plan
         id: parse
@@ -66,7 +66,7 @@ jobs:
         with:
           name: tfplan
           path: terraform
-      - run: terraform init
+      - run: terraform init -backend-config="bucket=${{ vars.STATE_BUCKET_NAME }}" -backend-config="dynamodb_table=${{ vars.STATE_TABLE_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - run: terraform apply -auto-approve tfplan
 
   manual-apply:
@@ -89,5 +89,5 @@ jobs:
         with:
           name: tfplan
           path: terraform
-      - run: terraform init
+      - run: terraform init -backend-config="bucket=${{ vars.STATE_BUCKET_NAME }}" -backend-config="dynamodb_table=${{ vars.STATE_TABLE_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - run: terraform apply tfplan

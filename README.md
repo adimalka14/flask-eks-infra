@@ -41,17 +41,23 @@ cp terraform/terraform.example.tfvars terraform/terraform.tfvars
 
 ### 1.2 Bootstrap remote state (S3 + DynamoDB)
 
+Because the CI/CD pipeline requires the state bucket to already exist in order to lock and store the state, you MUST manually bootstrap the remote state once before running the main infrastructure or pushing to GitHub Actions.
+
 ```bash
-cd terraform
+cd terraform/bootstrap
 terraform init
-terraform apply -target=module.bootstrap
+terraform apply -var="bucket_name=flask-eks-infra-tr-state" -var="table_name=flask-eks-infra-tr-lock" -var="environment=dev"
 ```
 
 This creates the S3 bucket and DynamoDB lock table used as the Terraform backend.
 
 ### 1.3 Provision all resources
 
+Once the remote state backend is bootstrapped, you can run the main infrastructure (or let GitHub Actions handle it automatically):
+
 ```bash
+cd ../ # return to the terraform directory
+terraform init
 terraform apply
 ```
 
@@ -136,9 +142,11 @@ Open the printed URL in a browser — the app should return:
 
 ## Step 4 — GitHub Actions (CI/CD)
 
-### 4.1 Required Secrets
+### 4.1 Required Secrets & Variables
 
-Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+Go to **Settings → Secrets and variables → Actions**.
+
+**Add the following under "Secrets"**:
 
 | Secret | Where to get it |
 |--------|----------------|
@@ -147,7 +155,14 @@ Go to **Settings → Secrets and variables → Actions → New repository secret
 | `AWS_REGION` | e.g. `us-east-1` |
 | `GRAFANA_PASSWORD` | Password for Grafana admin (must contain letters, not digits only) |
 
-> **Note:** `ECR_REPOSITORY_URL` and `EKS_CLUSTER_NAME` are **not** needed as secrets — the CD pipeline reads them directly from `terraform output`.
+**Add the following under "Variables"**:
+
+| Variable | Description |
+|----------|-------------|
+| `STATE_BUCKET_NAME` | The exact name of the S3 bucket you created for Terraform state (e.g., `flask-eks-infra-tr-state`) |
+| `STATE_TABLE_NAME` | The exact name of the DynamoDB table you created for state locking (e.g., `flask-eks-infra-tr-lock`) |
+
+> **Note:** `ECR_REPOSITORY_URL` and `EKS_CLUSTER_NAME` are **not** needed as secrets or variables — the CD pipeline reads them directly from `terraform output`.
 
 ### 4.2 Required Environment
 

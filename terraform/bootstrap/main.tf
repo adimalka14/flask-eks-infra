@@ -1,3 +1,17 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.46"
+    }
+  }
+  required_version = ">= 1.15"
+}
+
+provider "aws" {
+  region = var.region
+}
+
 resource "aws_s3_bucket" "state" {
   bucket        = var.bucket_name
   force_destroy = false

@@ -1,4 +1,13 @@
 terraform {
+  required_version = ">= 1.15"
+
+  backend "s3" {
+    # The bucket, key, region, and dynamodb_table must be provided via -backend-config
+    # in the CI/CD pipeline or local terraform init command.
+    key     = "infra/terraform.tfstate"
+    encrypt = true
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -13,7 +22,6 @@ terraform {
       version = "~> 3.0"
     }
   }
-  required_version = ">= 1.15"
 }
 
 provider "aws" {
@@ -111,16 +119,12 @@ module "eks" {
 
 
 
-module "bootstrap" {
-  source = "./modules/bootstrap"
-  bucket_name = var.bucket_name
-  table_name = var.table_name
-  environment = var.environment
-}
+
 
 resource "aws_ecr_repository" "app" {
   name                 = var.project_name
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
 
   image_scanning_configuration {
     scan_on_push = true
