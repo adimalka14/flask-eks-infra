@@ -18,6 +18,9 @@ jobs:
       - name: Run tests
         run: docker run flask-app:test python -m pytest tests/ -v
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Terraform validate
         working-directory: terraform
         run: |
