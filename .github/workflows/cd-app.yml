@@ -31,7 +31,7 @@ jobs:
       - name: Get Terraform outputs
         working-directory: terraform
         run: |
-          terraform init
+          terraform init -backend-config="bucket=${{ vars.STATE_BUCKET_NAME }}" -backend-config="dynamodb_table=${{ vars.STATE_TABLE_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
           echo "CLUSTER_NAME=$(terraform output -raw cluster_name)" >> $GITHUB_ENV
           echo "ECR_REPO_URL=$(terraform output -raw ecr_repository_url)" >> $GITHUB_ENV
           echo "REGION=$(terraform output -raw region)" >> $GITHUB_ENV
