@@ -118,6 +118,11 @@ module "bootstrap" {
   environment = var.environment
 }
 
+import {
+  to = aws_ecr_repository.app
+  id = "flask-eks-infra"
+}
+
 resource "aws_ecr_repository" "app" {
   name                 = var.project_name
   image_tag_mutability = "MUTABLE"
