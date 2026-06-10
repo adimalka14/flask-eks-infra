@@ -1,7 +1,7 @@
 variable "project_name" {
   description = "Prefix applied to all resource names"
   type        = string
-  default     = "flask-eks-infra"
+  default     = "eks-production-stack"
 }
 
 variable "region" {
@@ -31,7 +31,7 @@ variable "private_subnet_count" {
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "flask-eks-infra-cluster"
+  default     = "eks-production-cluster"
 }
 
 variable "cluster_version" {
