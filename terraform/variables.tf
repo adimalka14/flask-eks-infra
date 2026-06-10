@@ -1,7 +1,7 @@
 variable "project_name" {
   description = "Prefix applied to all resource names"
   type        = string
-  default     = "eks-production-stack"
+  default     = "flask-eks-infra"
 }
 
 variable "region" {
@@ -19,19 +19,19 @@ variable "vpc_cidr" {
 variable "public_subnet_count" {
   description = "Number of public subnets"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "private_subnet_count" {
   description = "Number of private subnets"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "eks-production-cluster"
+  default     = "flask-eks-infra-cluster"
 }
 
 variable "cluster_version" {
@@ -43,7 +43,11 @@ variable "cluster_version" {
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
-  default     = {}
+  default     = {
+    Environment = "dev"
+    Project     = "flask-eks"
+    ManagedBy   = "terraform"
+  }
 }
 
 variable "grafana_password" {
