@@ -34,7 +34,5 @@ echo "==> Importing CloudWatch log group..."
 terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' "/aws/eks/$CLUSTER_NAME/cluster" || true
 
 echo ""
-echo "==> All imports done. Running plan to verify..."
-terraform plan -out=tfplan
-echo ""
-echo "Review the plan above. If it looks clean, run: terraform apply tfplan"
+echo "==> All imports done."
+echo "Run 'terraform plan' to verify state is clean before the next CI run."
