@@ -27,6 +27,8 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Get Terraform outputs
         working-directory: terraform
